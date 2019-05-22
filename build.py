@@ -1,29 +1,45 @@
 #!/usr/bin/env python3
 
+import argparse
+import os
 import shutil
 import subprocess
 import sys
 
 
-HELP = """Python Feet Build Script
+parser = argparse.ArgumentParser()
+subparsers = parser.add_subparsers(dest='command')
 
-This simple script builds Feet for Windows.
+build_parser = subparsers.add_parser('build')
+build_parser.add_argument('--debug', action='store_true')
 
-python build.py build
-python build.py clean
-"""
+clean_parser = subparsers.add_parser('clean')
 
+setup_parser = subparsers.add_parser('setup')
+
+def clean():
+    if os.path.exists("dist"):
+        shutil.rmtree("dist")
+    if os.path.exists("build"):
+        shutil.rmtree("build")
 
 def main(argv):
-    if len(argv) == 1:
-        print(HELP)
-    else:
-        if argv[1] == "build":
-            subprocess.check_call(["pyinstaller", "--onefile", "feet.py"])
-        elif argv[1] == "clean":
-            shutil.rmtree("dist")
-        elif argv[1] == "setup":
-            subprocess.check_call(["pip", "install", "-r", "requirements.txt"])
+    if argv[0] == 'build.py':
+        argv = argv[1:]
+    args = parser.parse_args(argv)
+    print(args)
+
+    if args.command == "build":
+        clean()
+        cmd = ['pyinstaller']
+        if not args.debug:
+            cmd += ['--onefile']
+        cmd += ['feet.py']
+        subprocess.check_call(cmd)
+    elif args.command == "clean":
+        clean()
+    elif args.command == "setup":
+        subprocess.check_call(["pip", "install", "-r", "requirements.txt"])
 
 
 if __name__ == '__main__':

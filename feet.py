@@ -1,7 +1,16 @@
+import argparse
 import os
 import sys
 
-import pygame
+# trigger inclusion
+import dataclasses
+import pathlib
+
+import pip.__main__, pip._internal, pip._vendor
+# import pygame
+
+sys.path.insert(0, '.\\Lib\\site-packages\\')
+sys.path.insert(0, '.')
 
 
 HELP = """FEET, it makes Python run!
@@ -27,21 +36,54 @@ file. Put this EXE in a folder with your main.py script and run it again!
 """
 
 
+parser = argparse.ArgumentParser(description='Make Python Run')
+parser.add_argument('command', metavar='CMD', type=str, nargs='?',
+                    help='an optional subcommand', default='run')
+parser.add_argument('parameter', metavar='PARAM', type=str, nargs='?',
+                    help='an optional subcommand', default=None)
+
+
+
+
 def main(argv):
     feet_exec = argv.pop(0)
-    if argv:
-        root = argv.pop(0)
-    else:
-        root = "."
-    
-    path = os.path.join(root, "main.py")
+    args = parser.parse_args(argv)
+    print(args.command)
 
-    if not os.path.exists(path):
-        print(HELP)
-    else:
-        init_py = open(path).read()
-        exec(init_py)
-    
+    # if argv:
+    #     root = argv.pop(0)
+    # else:
+    #     root = "."
+
+    root = "."
+    path = os.path.join(root, "main.py")
+    sys.path.append(os.path.join('.', 'Lib', 'site-packages'))
+
+    if args.command == 'run':
+        if not os.path.exists(path):
+            print(HELP)
+        else:
+            # init_py = open(path).read()
+            # exec(init_py)
+            import main
+    elif args.command == 'shell':
+        try:
+            import readline # optional, will allow Up/Down/History in the console
+        except ImportError:
+            pass
+        import code
+        variables = globals().copy()
+        variables.update(locals())
+        shell = code.InteractiveConsole(variables)
+        shell.interact()
+    elif args.command == 'library':
+        # from subprocess import check_output, CalledProcessError
+        # try:
+            # check_output([sys.executable, '-m', 'pip', 'install', '--prefix=.', args.parameter])
+        # except CalledProcessError as e:
+            # print(e.output)
+        cert_path = '.\\Lib\\site-packages\\pip\\_vendor\\certifi\\'
+        pip._internal.main(['install', '--prefix=.', '--trusted-host=pypi.org', args.parameter])
 
 
 if __name__ == '__main__':
