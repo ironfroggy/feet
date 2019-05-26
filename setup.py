@@ -20,7 +20,6 @@ setuptools.setup(
     },
     install_requires=[
         'requirements-parser',
-        # 'pip==19.1.1',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
