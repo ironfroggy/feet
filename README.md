@@ -4,9 +4,8 @@ FEET is a runner for Python. What does that mean?
 
 It makes it easy to create Python scripts, programs, applications, or games
 and package them up to send to friends, users, players, or whomever you want
-to share your work with. FEET is really just a wrapper around the excellent
-PyInstaller project and it is *mostly* for Windows users, because they have
-the hardest time sharing Python code.
+to share your work with. FEET is currently being built for Windows, but Linux
+and Mac versions will hopefully arrive in the future!
 
 FEET is just an executable, called `feet.exe`, that sits in a folder beside
 your script that you name `main.py`. You can zip up this folder and send it
@@ -16,11 +15,18 @@ or package anything.
 
 Just send them your files and the runner.
 
+When users run your program via `feet.exe` the first time, it will unpack a
+runtime to a `feet/` sub-folder. You can remove this at any time, especially
+before zipping your program to share.
+
 Note: Feet is a prototype, but please let me know if you find it useful and
 file issues for any improvements that you feel would help make it less of an
 experiment and more of a real thing.
 
 ## BUILDING
+
+FEET includes a bootloader written in rust. Make sure you have a recent version
+of the Rust compiler and Cargo tool installed.
 
 To build feet, install the build dependencies and then run the build script.
 
@@ -85,5 +91,5 @@ Python Feet is a prototype. It definitely has bugs and will definitely have
 breaking changes. However, if you find it useful, that's great! If you find
 problems with it or if you want to help, please file issues on the [Github
 page](https://github.com/ironfroggy/feet/issues) with all the details you
-can include, or find me on Twitter [@ironfroggy](https://twitter.com/ironfroggy) to thank, complain to, or discuss Python
-with.
+can include, or find me on Twitter [@ironfroggy](https://twitter.com/ironfroggy)
+to thank, complain to, or discuss Python with.
