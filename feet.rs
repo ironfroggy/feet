@@ -1,6 +1,6 @@
 use std::env;
 use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader, Error, ErrorKind};
+use std::io::{BufRead, BufReader, Error, ErrorKind, Write, stdout};
 // use std::io::Error;
 use std::path::Path;
 use std::io;
@@ -23,34 +23,41 @@ fn browse_zip_archive<T, F, U>(buf: &mut T, browse_func: F) -> ZipResult<Vec<U>>
 }
 
 fn main() -> Result<(), Error> {
-    // let mut file = File::open("example.zip").expect("Couldn't open file");
-    // let files = browse_zip_archive(&mut file, |f| {
-    //     Ok(format!("{}: {} -> {}", f.name(), f.size(), f.compressed_size()))
-    // });
-    // println!("{:?}", files);
+    let mod_exec = fs::metadata("feet.exe")?.modified()?;
+    let mod_runtime = fs::metadata("feet")?.modified()?;
 
-    if (!Path::new("./feet/").exists()) {
-        // let archive_path = "feetruntime.zip";
+    if (mod_exec > mod_runtime) {
+        fs::remove_dir_all("./feet/");
+    }
+
+    if Path::new("./feetmaker.py").exists() {
+        println!("Do not run feet.exe in its own source directory");
+        std::process::exit(1);
+    }
+
+    if !Path::new("./feet/").exists() {
+        print!("Extracting the Python Feet Runtime... (one-time operation)");
         let archive_path = "./feet.exe";
         let file = fs::File::open(&archive_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
+        let total = archive.len();
         
-        for i in 0..archive.len() {
+        for i in 0..total {
             let mut file = archive.by_index(i).unwrap();
             let outpath = file.sanitized_name();
 
-            {
-                let comment = file.comment();
-                if !comment.is_empty() {
-                    println!("File {} comment: {}", i, comment);
-                }
-            }
-
             if (&*file.name()).ends_with('/') {
-                println!("File {} extracted to \"{}\"", i, outpath.as_path().display());
                 fs::create_dir_all(&outpath).unwrap();
             } else {
-                println!("File {} extracted to \"{}\" ({} bytes)", i, outpath.as_path().display(), file.size());
+                // println!("File {} extracted to \"{}\" ({} bytes)", i, outpath.as_path().display(), file.size());
+                if i == 0 {
+                    println!();
+                } else if i % 100 == 0 {
+                    println!(" {}/{}", i, total);
+                } else {
+                    print!(".");
+                    stdout().flush();
+                }
                 if let Some(p) = outpath.parent() {
                     if !p.exists() {
                         fs::create_dir_all(&p).unwrap();
@@ -70,6 +77,17 @@ fn main() -> Result<(), Error> {
                 }
             }
         }
+    }
+
+    // Next, if there is a requirements file, install that
+    if Path::new("./requirements.txt").exists() && !Path::new("./Lib/").exists() {
+        let mut child = Command::new("./feet/cpython/python")
+            .args(&["./feet/feet.py", "library", "--update"])
+            .stderr(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stdin(Stdio::inherit())
+            .spawn()?;
+        child.wait();
     }
 
     // Now, runtime is either extracted or already was, so run the commands

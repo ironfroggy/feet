@@ -5,3 +5,10 @@ __pycache__
 *.pyo
 /target
 **/*.rs.bk
+feet/cpython/
+Lib/
+Scripts/
+feet.exe
+feet.pdb
+feet.egg-info
+feet*.zip
