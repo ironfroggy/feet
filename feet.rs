@@ -23,16 +23,18 @@ fn browse_zip_archive<T, F, U>(buf: &mut T, browse_func: F) -> ZipResult<Vec<U>>
 }
 
 fn main() -> Result<(), Error> {
-    let mod_exec = fs::metadata("feet.exe")?.modified()?;
-    let mod_runtime = fs::metadata("feet")?.modified()?;
-
-    if (mod_exec > mod_runtime) {
-        fs::remove_dir_all("./feet/");
-    }
-
     if Path::new("./feetmaker.py").exists() {
         println!("Do not run feet.exe in its own source directory");
         std::process::exit(1);
+    }
+
+    if Path::new("./feet/").exists() {
+        let mod_exec = fs::metadata("feet.exe")?.modified()?;
+        let mod_runtime = fs::metadata("feet")?.modified()?;
+
+        if (mod_exec > mod_runtime) {
+            fs::remove_dir_all("./feet/");
+        }
     }
 
     if !Path::new("./feet/").exists() {
