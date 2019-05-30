@@ -38,7 +38,7 @@ fn main() -> Result<(), Error> {
     }
 
     if !Path::new("./feet/").exists() {
-        print!("Extracting the Python Feet Runtime... (one-time operation)");
+        println!("Extracting the Python Feet Runtime... (one-time operation)");
         let archive_path = "./feet.exe";
         let file = fs::File::open(&archive_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
@@ -51,12 +51,9 @@ fn main() -> Result<(), Error> {
             if (&*file.name()).ends_with('/') {
                 fs::create_dir_all(&outpath).unwrap();
             } else {
-                // println!("File {} extracted to \"{}\" ({} bytes)", i, outpath.as_path().display(), file.size());
-                if i == 0 {
-                    println!();
-                } else if i % 100 == 0 {
-                    println!(" {}/{}", i, total);
-                } else {
+                if i % 100 == 0 && i != 0 {
+                    println!(" {}% ", ((i as f64 / total as f64) * 100.0) as i32);
+                } else if i != 0 {
                     print!(".");
                     stdout().flush();
                 }
@@ -79,6 +76,7 @@ fn main() -> Result<(), Error> {
                 }
             }
         }
+        println!(" done!");
     }
 
     // Next, if there is a requirements file, install that

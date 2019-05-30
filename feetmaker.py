@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import fnmatch
 import os
 import shutil
 import subprocess
@@ -22,27 +23,80 @@ python_loc = os.getenv("FEET_PYTHON_DIR")
 assert python_loc, "Please set $FEET_PYTHON_DIR to a checkout of CPython which you have compiled."
 
 
-def clean():
-    if os.path.exists("feet/cpython"):
-        shutil.rmtree("feet/cpython")
+# These patterns will be excluded from the generated Zip archives
+zip_excludes = [
+    '*wininst*',
+    '*__pycache__*',
+    '*.pyc',
+    '*venv*.exe',
+    '*/pythonw.exe',
+    '*/py.exe',
+    '*/pyw.exe',
+    'test/**',
+]
 
-
-def zipdir(path, dest):
-    zipf = zipfile.ZipFile(dest, 'w', zipfile.ZIP_DEFLATED)
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            src = os.path.join(root, file)
-            if '__pycache__' not in src and '.pyc' not in src:
-                zipf.write(src)
-    zipf.close()
-
-
+# These third-party packages will be included in the build
 py_deps = (
     'requirements',
     'pip',
     'setuptools',
     'pkg_resources',
 )
+
+# These first-party modules will be included outside the stdlib archive
+non_zip_modules = (
+    'importlib',
+    'collections',
+    '_weakref',
+    '_io',
+    'encodings',
+    'codecs',
+    '_codecs',
+    '_signal',
+    '__main__',
+    'io',
+    'abc',
+    '_abc',
+    'site',
+    'os',
+    'stat',
+    '_stat',
+    'ntpath',
+    'genericpath',
+    '_collections_abc',
+    '_sitebuiltins',
+    '_bootlocale',
+    '_locale',
+)
+
+
+def clean():
+    if os.path.exists("feet/cpython"):
+        shutil.rmtree("feet/cpython")
+
+
+def zipdir(path, relto, dest, compression):
+    zipf = zipfile.ZipFile(dest, 'w', compression)
+    relto = relto or path
+
+    if path.endswith('*'):
+        path = path[:-2]
+    print("Writing zip file", dest, "from", path)
+
+    for root, _, files in os.walk(path):
+        
+        for file in files:
+            src = os.path.join(root, file)
+            name = os.path.relpath(src, relto)
+            excluded = False
+            for pattern in zip_excludes:
+                if fnmatch.fnmatch(name, pattern):
+                    excluded = True
+                    break
+            if not excluded:
+                zipf.write(src, name)
+    
+    zipf.close()
 
 
 def main():
@@ -64,17 +118,44 @@ def main():
             os.path.join(python_loc, "PCbuild", "win32"),
             "feet/cpython",
         )
-        shutil.copytree(
-            os.path.join(python_loc, "Lib"),
-            "feet/cpython/lib/",
+
+        os.makedirs("feet/cpython/lib")
+        for name in non_zip_modules:
+            src = os.path.join(python_loc, "lib", name)
+            if not os.path.exists(src):
+                name += ".py"
+                src = os.path.join(python_loc, "lib", name)
+            # if not os.path.exists(src):
+            #     print("missing", src)
+            else:
+                if os.path.isdir(src):
+                    shutil.copytree(src, f"feet/cpython/lib/{name}")
+                else:
+                    shutil.copy(
+                        src,
+                        "feet/cpython/lib/",
+                    )
+        
+        # Create the stdlib zip to make unpacking faster
+        zipdir(
+            os.path.join(python_loc, "lib"),
+            None,
+            os.path.join("feet", "cpython", "python37.zip"),
+            zipfile.ZIP_STORED,
         )
-        shutil.rmtree("feet/cpython/lib/test")
+
+        # Create the archive to attach to feet.exe to self-extract
         for name in py_deps:
             shutil.copytree(
                 os.path.join(".", "Lib", name),
                 f"feet/cpython/lib/site-packages/{name}",
             )
-        zipdir('./feet/', './feetruntime.zip')
+        zipdir(
+            './feet/',
+            '.',
+            './feetruntime.zip',
+            zipfile.ZIP_BZIP2,
+        )
         
         print("Combining...")
         base = open('target/debug/feet.exe', 'rb')
