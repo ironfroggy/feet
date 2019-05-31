@@ -1,46 +1,35 @@
 use std::env;
-use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader, Error, ErrorKind, Write, stdout};
-// use std::io::Error;
-use std::path::Path;
-use std::io;
 use std::fs;
+use std::io;
+use std::io::{Error, Write, stdout};
+use std::path::Path;
+use std::process::{Command, Stdio};
 
-use std::io::{Seek, Read};
-use zip::result::ZipResult;
-use zip::read::{ZipFile, ZipArchive};
-// use zip::write::{FileOptions, ZipWriter};
-use std::fs::File;
-
-fn browse_zip_archive<T, F, U>(buf: &mut T, browse_func: F) -> ZipResult<Vec<U>>
-    where T: Read + Seek,
-          F: Fn(&ZipFile) -> ZipResult<U>
-{
-    let mut archive = ZipArchive::new(buf)?;
-    (0..archive.len())
-        .map(|i| archive.by_index(i).and_then(|file| browse_func(&file)))
-        .collect()
-}
 
 fn main() -> Result<(), Error> {
+    let exec = std::env::current_exe()?;
+    let exec_path = Path::new(&exec);
+    let exec_name = exec_path.file_name().unwrap();
+    let exec_base = exec_path.file_stem().unwrap().to_str().expect("cannot get file stem");
+    let data_dir = format!("{}_data", exec_base);
+
     if Path::new("./feetmaker.py").exists() {
-        println!("Do not run feet.exe in its own source directory");
+        println!("Do not run {:?} in its own source directory", exec_name);
         std::process::exit(1);
     }
 
-    if Path::new("./feet/").exists() {
-        let mod_exec = fs::metadata("feet.exe")?.modified()?;
-        let mod_runtime = fs::metadata("feet")?.modified()?;
+    if Path::new(&data_dir).exists() {
+        let mod_exec = Path::new(&exec_name).metadata()?.modified()?;
+        let mod_runtime = Path::new(&data_dir).metadata()?.modified()?;
 
-        if (mod_exec > mod_runtime) {
-            fs::remove_dir_all("./feet/");
+        if mod_exec > mod_runtime {
+            fs::remove_dir_all(Path::new(&data_dir))?;
         }
     }
 
-    if !Path::new("./feet/").exists() {
+    if !Path::new(&data_dir).exists() {
         println!("Extracting the Python Feet Runtime... (one-time operation)");
-        let archive_path = "./feet.exe";
-        let file = fs::File::open(&archive_path).unwrap();
+        let file = fs::File::open(&exec_name).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
         let total = archive.len();
         
@@ -55,7 +44,7 @@ fn main() -> Result<(), Error> {
                     println!(" {}% ", ((i as f64 / total as f64) * 100.0) as i32);
                 } else if i != 0 {
                     print!(".");
-                    stdout().flush();
+                    stdout().flush()?;
                 }
                 if let Some(p) = outpath.parent() {
                     if !p.exists() {
@@ -76,18 +65,21 @@ fn main() -> Result<(), Error> {
                 }
             }
         }
+        std::fs::rename("feet", &data_dir)?;
         println!(" done!");
     }
 
     // Next, if there is a requirements file, install that
     if Path::new("./requirements.txt").exists() && !Path::new("./Lib/").exists() {
-        let mut child = Command::new("./feet/cpython/python")
-            .args(&["./feet/feet.py", "library", "--update"])
+        let script = &format!("{}/feet.py", data_dir);
+        println!("Installing requirements... {}", script);
+        let mut child = Command::new(format!("{}/cpython/python", data_dir))
+            .args(&[script, "library", "--update"])
             .stderr(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stdin(Stdio::inherit())
             .spawn()?;
-        child.wait();
+        child.wait().expect("Invoking the Feet runtime script failed.");
     }
 
     // Now, runtime is either extracted or already was, so run the commands
@@ -95,14 +87,15 @@ fn main() -> Result<(), Error> {
     let mut args: Vec<String> = env::args().collect();
     args.remove(0);
 
-    let mut child = Command::new("./feet/cpython/python")
-        .arg("./feet/feet.py")
+    println!("{}/feet.py", data_dir);
+    let mut child = Command::new(format!("{}/cpython/python", data_dir))
+        .arg(format!("{}/feet.py", data_dir))
         .args(args)
         .stderr(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stdin(Stdio::inherit())
         .spawn()?;
 
-    child.wait();
+    child.wait().expect("Invoking the Feet runtime script failed.");
     Ok(())
 }

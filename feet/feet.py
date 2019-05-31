@@ -1,6 +1,11 @@
 import argparse
+import fnmatch
+import glob
 import os
+import shutil
+import subprocess
 import sys
+import zipfile
 
 # Add path for included third-party packages with the Feet runtime
 sys.path.insert(0, os.path.join(sys.executable, 'Lib', 'site-packages'))
@@ -48,22 +53,63 @@ library_parser.add_argument('spec', type=str, nargs='?')
 
 shell_parser = subparsers.add_parser('shell')
 
+bundle_parser = subparsers.add_parser('bundle')
+bundle_parser.add_argument('name', type=str, action='store')
+bundle_parser.add_argument('files', type=str, nargs='+')
+
+
+zip_excludes = [
+    "*.pyc",
+    "__pycache__",
+]
+
+def add_to_zip(path, dest, compression):
+    zipf = zipfile.ZipFile(dest, 'a', compression)
+
+    for root, _, files in os.walk(path):
+        for file in files:
+            src = os.path.join(root, file)
+            name = os.path.relpath(src, ".")
+
+            excluded = False
+            for pattern in zip_excludes:
+                if fnmatch.fnmatch(name, pattern):
+                    excluded = True
+                    break
+            if not excluded:
+                name = os.path.join("feet", "app", name)
+                print("...", name)
+                zipf.write(src, name)
+    
+    zipf.close()
+
 
 def main(argv):
     feet_exec = argv.pop(0)
     args = parser.parse_args(argv)
 
-    root = "."
-    path = os.path.join(root, "main.py")
-    sys.path.append(os.path.join('.', 'Lib', 'site-packages'))
+    root = os.path.abspath(os.path.dirname(__file__))
+    feet_bin = root.split('_data')[0] + '.exe'
+    assert os.path.exists(feet_bin)
+    py_bin = os.path.join(root, "cpython", "python.exe")
+    
+    main =  os.path.join(root, "app", "main.py")
+    if not os.path.exists(main):
+        main =  os.path.join(root, "..", "main.py")
+    if not os.path.exists(main):
+        print(HELP)
+        exit(1)
+
+    # sys.path.append(os.path.join(os.path.dirname(main), 'Lib', 'site-packages'))
 
     if args.command == 'run' or not args.command:
-        if not os.path.exists(path):
-            print(HELP)
-        else:
-            # At this point, we import the main script to "run" it.
-            # This import statement will block until the Feet app is done.
-            import main
+        env = os.environ.copy()
+        env.update({
+            'PYTHONPATH': ':'.join((
+                os.path.join(os.path.dirname(main), 'Lib', 'site-packages'),
+            )),
+        })
+        subprocess.Popen([py_bin, main], env=env)
 
     elif args.command == 'shell':
         try:
@@ -102,6 +148,24 @@ def main(argv):
             with open('requirements.txt', 'w') as f:
                 for _, line in cur_libraries.items():
                     f.write(f'{line}\n')
+    
+    elif args.command == 'bundle':
+        name = args.name
+        if not name.endswith('.exe'):
+            name += ".exe"
+        include = args.files or [main]
+
+        shutil.copy(feet_bin, name)
+
+        zf = zipfile.ZipFile(name, 'a', zipfile.ZIP_BZIP2)
+        for pattern in include:
+            for f in glob.glob(pattern):
+                print(f, "->", os.path.join("feet", "app", f))
+                zf.write(f, os.path.join("feet", "app", f))
+        zf.close()
+
+        if os.path.exists("Lib/site-packages/"):
+            add_to_zip("Lib", name, zipfile.ZIP_BZIP2)
 
 
 if __name__ == '__main__':
