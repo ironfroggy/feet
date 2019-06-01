@@ -53,17 +53,21 @@ library_parser.add_argument('spec', type=str, nargs='?')
 
 shell_parser = subparsers.add_parser('shell')
 
-bundle_parser = subparsers.add_parser('bundle')
-bundle_parser.add_argument('name', type=str, action='store')
-bundle_parser.add_argument('files', type=str, nargs='+')
+exe_parser = subparsers.add_parser('exe')
+exe_parser.add_argument('name', type=str, action='store')
+exe_parser.add_argument('files', type=str, nargs='+')
 
+zip_parser = subparsers.add_parser('zip')
+zip_parser.add_argument('name', type=str, action='store')
 
 zip_excludes = [
     "*.pyc",
-    "__pycache__",
+    "*__pycache__*",
 ]
 
-def add_to_zip(path, dest, compression):
+def add_to_zip(path, dest, compression, prefix=None):
+    if not prefix:
+        prefix = os.path.join("feet", "app")
     zipf = zipfile.ZipFile(dest, 'a', compression)
 
     for root, _, files in os.walk(path):
@@ -73,11 +77,11 @@ def add_to_zip(path, dest, compression):
 
             excluded = False
             for pattern in zip_excludes:
-                if fnmatch.fnmatch(name, pattern):
+                if fnmatch.fnmatch(os.path.abspath(name), pattern):
                     excluded = True
                     break
             if not excluded:
-                name = os.path.join("feet", "app", name)
+                name = os.path.join(prefix, name)
                 print("...", name)
                 zipf.write(src, name)
     
@@ -149,7 +153,7 @@ def main(argv):
                 for _, line in cur_libraries.items():
                     f.write(f'{line}\n')
     
-    elif args.command == 'bundle':
+    elif args.command == 'exe':
         name = args.name
         if not name.endswith('.exe'):
             name += ".exe"
@@ -166,6 +170,19 @@ def main(argv):
 
         if os.path.exists("Lib/site-packages/"):
             add_to_zip("Lib", name, zipfile.ZIP_BZIP2)
+    
+    elif args.command == 'zip':
+        name = args.name
+        if not name.endswith('.zip'):
+            name += ".zip"
+        if not name.startswith('dist/'):
+            name = "dist/" + name
+        if not os.path.exists("dist"):
+            os.makedirs("dist")
+        
+        zip_excludes.append(os.path.join(os.path.abspath(root), '*'))
+        zip_excludes.append(os.path.join(os.path.abspath("dist"), '*'))
+        add_to_zip(".", name, zipfile.ZIP_DEFLATED, prefix=".")
 
 
 if __name__ == '__main__':
