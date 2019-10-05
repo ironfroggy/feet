@@ -101,7 +101,7 @@ def test_exe(rundir, tempdir, build):
     assert os.path.exists('feet_data/cpython/lib/site-packages/future')
     call('./feet.exe exe testprog.exe main.py')
     with TemporaryDirectory() as exedir:
-        copyfile('testprog.exe', os.path.join(exedir, 'testprog.exe'))
+        copyfile('dist/testprog.exe', os.path.join(exedir, 'testprog.exe'))
 
         with cd(exedir):
             assert 0 == call('./testprog.exe setup')

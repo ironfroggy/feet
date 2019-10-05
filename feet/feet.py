@@ -61,10 +61,11 @@ setup_parser = subparsers.add_parser('setup')
 
 exe_parser = subparsers.add_parser('exe')
 exe_parser.add_argument('name', type=str, action='store')
-exe_parser.add_argument('files', type=str, nargs='+')
+exe_parser.add_argument('files', type=str, nargs='*')
 
 zip_parser = subparsers.add_parser('zip')
 zip_parser.add_argument('name', type=str, action='store')
+zip_parser.add_argument('files', type=str, nargs='*')
 
 zip_excludes = [
     "*.pyc",
@@ -175,7 +176,14 @@ def main(argv):
         name = args.name
         if not name.endswith('.exe'):
             name += ".exe"
+        if not name.startswith('dist/'):
+            name = "dist/" + name
+            if not os.path.exists('dist'):
+                os.mkdir('dist')
+
         include = args.files or [main]
+        zip_excludes.append(os.path.join(os.path.abspath(root), '*'))
+        zip_excludes.append(os.path.join(os.path.abspath("dist"), '*'))
 
         shutil.copy(feet_bin, name)
 
@@ -198,8 +206,17 @@ def main(argv):
         if not os.path.exists("dist"):
             os.makedirs("dist")
         
+        include = args.files or [main]
         zip_excludes.append(os.path.join(os.path.abspath(root), '*'))
         zip_excludes.append(os.path.join(os.path.abspath("dist"), '*'))
+
+        zf = zipfile.ZipFile(name, 'a', zipfile.ZIP_BZIP2)
+        for pattern in include:
+            for f in glob.glob(pattern):
+                print(f, "->", os.path.join("feet", "app", f))
+                zf.write(f, os.path.join("feet", "app", f))
+        zf.close()
+
         add_to_zip(".", name, zipfile.ZIP_DEFLATED, prefix=".")
 
 
