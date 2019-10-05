@@ -5,6 +5,7 @@ from shutil import copyfile
 from subprocess import call, Popen, PIPE
 from tempfile import TemporaryDirectory
 from time import sleep
+from zipfile import ZipFile
 
 import pytest
 
@@ -112,6 +113,36 @@ def test_exe(rundir, tempdir, build):
 
             lines = stdout.splitlines()
             assert lines and lines[-1] == "ok", stderr
+
+
+def test_zip(rundir, tempdir, build):
+    src = os.path.join(rundir, 'build', 'feet.exe')
+    dest = os.path.join(tempdir, 'feet.exe')
+    copyfile(src, dest)
+
+    open('main.py', 'w').write(MAIN_SETUPTOOLS)
+
+    call('./feet.exe library future')
+    assert os.path.exists('feet_data/cpython/lib/site-packages/future')
+    call('./feet.exe zip testprog.zip')
+    with TemporaryDirectory() as exedir:
+        copyfile('dist/testprog.zip', os.path.join(exedir, 'testprog.zip'))
+
+        with cd(exedir):
+            zf = ZipFile(os.path.join(exedir, 'testprog.zip'))
+            zf.extractall('.')
+            zf.close()
+
+            assert 0 == call('./feet.exe setup')
+
+            print("Running test program")
+            p = Popen("feet.exe", stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            stdout, stderr = p.communicate()
+            ret = p.returncode
+
+            lines = stdout.splitlines()
+            assert lines and lines[-1] == "ok", stderr
+
 
 
 MAIN_NONZERO = '''
