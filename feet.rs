@@ -128,7 +128,7 @@ fn main() -> Result<(), Error> {
 
     // Now, runtime is either extracted or already was, so run the commands
 
-    println!("{}/feet.py", data_dir);
+    // println!("{}/feet.py", data_dir);
     let mut child = Command::new(format!("{}/cpython/python", data_dir))
         .arg(format!("{}/feet.py", data_dir))
         .args(args)
@@ -137,6 +137,12 @@ fn main() -> Result<(), Error> {
         .stdin(Stdio::inherit())
         .spawn()?;
 
-    child.wait().expect("Invoking the Feet runtime script failed.");
-    Ok(())
+    let status = child.wait().expect("Invoking the Feet runtime script failed.");
+    match status.code() {
+        Some(code) => std::process::exit(code),
+        None       => {
+            println!("Process terminated by signal");
+            std::process::exit(255);
+        },
+    }
 }

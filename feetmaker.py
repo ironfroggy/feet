@@ -19,13 +19,13 @@ clean_parser = subparsers.add_parser('clean')
 
 setup_parser = subparsers.add_parser('setup')
 
-python_loc = os.getenv("FEET_PYTHON_DIR")
+python_loc = os.getenv("FEET_PYTHON_DIR", None)
 assert python_loc, "Please set $FEET_PYTHON_DIR to a checkout of CPython which you have compiled."
 
+py_bin = os.path.join(python_loc, 'PCBuild', 'win32', 'python.exe')
 
 # These patterns will be excluded from the generated Zip archives
 zip_excludes = [
-    '*wininst*',
     '*__pycache__*',
     '*.pyc',
     '*venv*.exe',
@@ -37,10 +37,10 @@ zip_excludes = [
 
 # These third-party packages will be included in the build
 py_deps = (
-    'requirements',
+    'requirements-parser',
     'pip',
     'setuptools',
-    'pkg_resources',
+    # 'pkg_resources',
 )
 
 # These first-party modules will be included outside the stdlib archive
@@ -146,10 +146,11 @@ def main():
 
         # Create the archive to attach to feet.exe to self-extract
         for name in py_deps:
-            shutil.copytree(
-                os.path.join(".", "Lib", name),
-                f"feet/cpython/lib/site-packages/{name}",
-            )
+            subprocess.check_call([py_bin, '-m', 'pip', 'install', name])
+        shutil.copytree(
+            os.path.join(python_loc, "Lib", "site-packages"),
+            f"feet/cpython/lib/site-packages",
+        )
         zipdir(
             './feet/',
             '.',
@@ -158,9 +159,12 @@ def main():
         )
         
         print("Combining...")
+        if not os.path.exists('build'):
+            os.mkdir('build')
+
         base = open('target/debug/feet.exe', 'rb')
         archive = open('feetruntime.zip', 'rb')
-        final = open('feet.exe', 'wb')
+        final = open('build/feet.exe', 'wb')
 
         final.write(base.read())
         final.write(archive.read())
@@ -176,3 +180,7 @@ def main():
 
     elif args.command == "setup":
         subprocess.check_call(["pip", "install", "-r", "requirements.txt"])
+
+
+if __name__ == '__main__':
+    main()

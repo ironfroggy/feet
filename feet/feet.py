@@ -7,11 +7,15 @@ import subprocess
 import sys
 import zipfile
 
+root = os.path.abspath(os.path.dirname(__file__))
+feet_bin = root.split('_data')[0] + '.exe'
+
 # Add path for included third-party packages with the Feet runtime
 sys.path.insert(0, os.path.join(sys.executable, 'Lib', 'site-packages'))
 
 # Add path for project required Python dependencies
-sys.path.insert(0, '.\\Lib\\site-packages\\')
+site_packages = os.path.join(root, 'cpython', 'lib', 'site-packages')
+sys.path.insert(0, site_packages)
 
 # Add path for the actual project, main script and all
 # TODO: Decide if this is necessary...?
@@ -53,6 +57,8 @@ library_parser.add_argument('spec', type=str, nargs='?')
 
 shell_parser = subparsers.add_parser('shell')
 
+setup_parser = subparsers.add_parser('setup')
+
 exe_parser = subparsers.add_parser('exe')
 exe_parser.add_argument('name', type=str, action='store')
 exe_parser.add_argument('files', type=str, nargs='+')
@@ -66,7 +72,7 @@ zip_excludes = [
 ]
 
 def add_to_zip(path, dest, compression, prefix=None):
-    if not prefix:
+    if prefix is None:
         prefix = os.path.join("feet", "app")
     zipf = zipfile.ZipFile(dest, 'a', compression)
 
@@ -74,6 +80,9 @@ def add_to_zip(path, dest, compression, prefix=None):
         for file in files:
             src = os.path.join(root, file)
             name = os.path.relpath(src, ".")
+            base = name.split(os.path.sep, 1)[0]
+            if base.endswith('_data'):
+                name = name.replace(base, 'feet', 1)
 
             excluded = False
             for pattern in zip_excludes:
@@ -81,9 +90,13 @@ def add_to_zip(path, dest, compression, prefix=None):
                     excluded = True
                     break
             if not excluded:
-                name = os.path.join(prefix, name)
-                print("...", name)
-                zipf.write(src, name)
+                name = os.path.relpath(os.path.join(prefix, name))
+                name = name.replace('\\', '/')
+                try:
+                    zipf.getinfo(name)
+                except KeyError:
+                    print("...", name)
+                    zipf.write(src, name)
     
     zipf.close()
 
@@ -92,8 +105,6 @@ def main(argv):
     feet_exec = argv.pop(0)
     args = parser.parse_args(argv)
 
-    root = os.path.abspath(os.path.dirname(__file__))
-    feet_bin = root.split('_data')[0] + '.exe'
     assert os.path.exists(feet_bin)
     py_bin = os.path.join(root, "cpython", "python.exe")
     
@@ -104,16 +115,25 @@ def main(argv):
         print(HELP)
         exit(1)
 
-    # sys.path.append(os.path.join(os.path.dirname(main), 'Lib', 'site-packages'))
-
     if args.command == 'run' or not args.command:
         env = os.environ.copy()
         env.update({
             'PYTHONPATH': ':'.join((
-                os.path.join(os.path.dirname(main), 'Lib', 'site-packages'),
+                site_packages,
             )),
         })
-        subprocess.Popen([py_bin, main], env=env)
+        proc = subprocess.Popen(
+            [py_bin, main],
+            env=env,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            stdin=sys.stdin,
+        )
+        sys.exit(proc.wait())
+    
+    elif args.command == 'setup':
+        print('Python Feet environemnt ready for use!')
+        return 0
 
     elif args.command == 'shell':
         try:
@@ -127,10 +147,9 @@ def main(argv):
         shell.interact()
 
     elif args.command == 'library':
-        import pip.__main__, pip._internal, pip._vendor
         if args.update:
             if os.path.exists('requirements.txt'):
-                pip._internal.main(['install', '--trusted-host=pypi.org', '--prefix=.', '-Ur', 'requirements.txt'])
+                subprocess.check_call([py_bin, '-m', 'pip', 'install', '--trusted-host=pypi.org', '-Ur', 'requirements.txt'])
             else:
                 print("This project has no Python libraries listed in a requirements.txt file.")
                 print("Use `feet libary some-library` to install libraries from Python's ecosystem to your project.")
@@ -144,9 +163,8 @@ def main(argv):
             new_req = list(requirements.parse(args.spec))[0]
             cur_libraries[new_req.name] = new_req.line
 
-            args = ['install', '--prefix=.', '--trusted-host=pypi.org', new_req.line]
-            retcode = pip._internal.main(args)
-            assert retcode == 0, "Library failed to install"
+            args = ['install', '--trusted-host=pypi.org', new_req.line]
+            subprocess.check_call([py_bin, '-m', 'pip', *args])
 
             print("Updating project requirements.txt file...")
             with open('requirements.txt', 'w') as f:
@@ -168,8 +186,8 @@ def main(argv):
                 zf.write(f, os.path.join("feet", "app", f))
         zf.close()
 
-        if os.path.exists("Lib/site-packages/"):
-            add_to_zip("Lib", name, zipfile.ZIP_BZIP2)
+        if os.path.exists(site_packages):
+            add_to_zip(site_packages, name, zipfile.ZIP_BZIP2, prefix='.')
     
     elif args.command == 'zip':
         name = args.name
@@ -186,4 +204,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    sys.exit(main(sys.argv))
