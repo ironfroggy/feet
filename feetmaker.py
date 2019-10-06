@@ -2,11 +2,15 @@
 
 import argparse
 import fnmatch
+import logging
 import os
 import shutil
 import subprocess
 import sys
 import zipfile
+
+
+logger = logging.getLogger(__name__)
 
 
 parser = argparse.ArgumentParser()
@@ -22,7 +26,8 @@ setup_parser = subparsers.add_parser('setup')
 python_loc = os.getenv("FEET_PYTHON_DIR", None)
 assert python_loc, "Please set $FEET_PYTHON_DIR to a checkout of CPython which you have compiled."
 
-py_bin = os.path.join(python_loc, 'PCBuild', 'win32', 'python.exe')
+arch = "amd64" # win32 or amd64
+py_bin = os.path.join(python_loc, 'PCBuild', arch, 'python.exe')
 
 # These patterns will be excluded from the generated Zip archives
 zip_excludes = [
@@ -115,7 +120,7 @@ def main():
 
         print("Creating runtime archive...")
         shutil.copytree(
-            os.path.join(python_loc, "PCbuild", "win32"),
+            os.path.join(python_loc, "PCbuild", arch),
             "feet/cpython",
         )
 
@@ -146,7 +151,11 @@ def main():
 
         # Create the archive to attach to feet.exe to self-extract
         for name in py_deps:
-            subprocess.check_call([py_bin, '-m', 'pip', 'install', name])
+            try:
+                subprocess.check_call([py_bin, '-m', 'pip', 'install', name])
+            except FileNotFoundError:
+                logger.error(f"Could not find python executable to install deps: {py_bin}")
+                raise
         shutil.copytree(
             os.path.join(python_loc, "Lib", "site-packages"),
             f"feet/cpython/lib/site-packages",
