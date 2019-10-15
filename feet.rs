@@ -114,7 +114,7 @@ fn main() -> Result<(), Error> {
     }
 
     // Next, if there is a requirements file, install that
-    if Path::new("./requirements.txt").exists() && !Path::new("./Lib/").exists() {
+    if Path::new("./requirements.txt").exists() && !Path::new(&data_dir).join("requirements_installed.txt").exists() {
         let script = &format!("{}/feet.py", data_dir);
         println!("Installing requirements... {}", script);
         let mut child = Command::new(format!("{}/cpython/python", data_dir))
@@ -124,6 +124,7 @@ fn main() -> Result<(), Error> {
             .stdin(Stdio::inherit())
             .spawn()?;
         child.wait().expect("Invoking the Feet runtime script failed.");
+        let _f = fs::File::create(Path::new(&data_dir).join("requirements_installed.txt"))?;
     }
 
     // Now, runtime is either extracted or already was, so run the commands

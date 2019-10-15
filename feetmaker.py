@@ -42,8 +42,8 @@ zip_excludes = [
 
 # These third-party packages will be included in the build
 py_deps = (
-    'requirements-parser',
     'pip',
+    'requirements-parser',
     'setuptools',
     # 'pkg_resources',
 )
@@ -152,7 +152,7 @@ def main():
         # Create the archive to attach to feet.exe to self-extract
         for name in py_deps:
             try:
-                subprocess.check_call([py_bin, '-m', 'pip', 'install', name])
+                subprocess.check_call([py_bin, '-m', 'pip', 'install', '-U', name])
             except FileNotFoundError:
                 logger.error(f"Could not find python executable to install deps: {py_bin}")
                 raise
