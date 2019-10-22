@@ -11,6 +11,7 @@ import zipfile
 
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 parser = argparse.ArgumentParser()
@@ -23,8 +24,10 @@ clean_parser = subparsers.add_parser('clean')
 
 setup_parser = subparsers.add_parser('setup')
 
-python_loc = os.getenv("FEET_PYTHON_DIR", None)
-assert python_loc, "Please set $FEET_PYTHON_DIR to a checkout of CPython which you have compiled."
+python_parser = subparsers.add_parser('python')
+
+python_loc_default = "cpython"
+python_loc = os.getenv("FEET_PYTHON_DIR", python_loc_default)
 
 arch = "amd64" # win32 or amd64
 py_bin = os.path.join(python_loc, 'PCBuild', arch, 'python.exe')
@@ -112,7 +115,17 @@ def main():
         print("You are not in the feet repo. Cannot build.")
         sys.exit(1)
 
-    if not args.command or args.command == "build":
+    if args.command == "python":
+        if not os.path.exists(python_loc):
+            assert python_loc_default == python_loc, "No python checkout found at FEET_PYTHON_DIR"
+            subprocess.check_call(f"git clone https://github.com/python/cpython.git {python_loc}")
+            subprocess.check_call(f"git checkout 3.7")
+
+        assert os.path.exists(f"./{python_loc}/PCBuild/build.bat")
+        print(f"./{python_loc}/PCBuild/build.bat -c Release -p x64 -t Build")
+        subprocess.check_call(f"{python_loc}\\PCBuild\\build.bat -c Release -p x64 -t Build")
+
+    elif not args.command or args.command == "build":
         clean()
 
         print("Compiling bootloader...")
@@ -122,24 +135,39 @@ def main():
         shutil.copytree(
             os.path.join(python_loc, "PCbuild", arch),
             "feet/cpython",
+            ignore=shutil.ignore_patterns('*.pdb'),
         )
-
+        
         os.makedirs("feet/cpython/lib")
-        for name in non_zip_modules:
-            src = os.path.join(python_loc, "lib", name)
-            if not os.path.exists(src):
-                name += ".py"
+
+        for name in os.listdir(os.path.join(python_loc, 'Lib')):
+            if name in non_zip_modules:
                 src = os.path.join(python_loc, "lib", name)
-            # if not os.path.exists(src):
-            #     print("missing", src)
-            else:
-                if os.path.isdir(src):
-                    shutil.copytree(src, f"feet/cpython/lib/{name}")
+                if not os.path.exists(src):
+                    name += ".py"
+                    src = os.path.join(python_loc, "lib", name)
+                if not os.path.exists(src):
+                    print("Missing", src)
                 else:
-                    shutil.copy(
-                        src,
-                        "feet/cpython/lib/",
-                    )
+                    print(f"Copying {src}")
+                    if os.path.isdir(src):
+                        shutil.copytree(src, f"feet/cpython/lib/{name}")
+                    else:
+                        shutil.copy(
+                            src,
+                            "feet/cpython/lib/",
+                        )
+            else:
+                # TODO: are we putting things in both the zip and outside the zip? wasting space?
+                src = os.path.join('cpython', 'Lib', name)
+                dest = os.path.join("feet/cpython/lib/", name)
+                if not os.path.exists(dest):
+                    if os.path.isdir(src):
+                        shutil.copytree(src, dest)
+                    else:
+                        shutil.copyfile(src, dest)
+                else:
+                    logger.warn(f"Cannot copy {src} -> {dest}")
         
         # Create the stdlib zip to make unpacking faster
         zipdir(
@@ -150,16 +178,17 @@ def main():
         )
 
         # Create the archive to attach to feet.exe to self-extract
+        subprocess.check_call([py_bin, '-m', 'ensurepip'])
         for name in py_deps:
             try:
                 subprocess.check_call([py_bin, '-m', 'pip', 'install', '-U', name])
             except FileNotFoundError:
                 logger.error(f"Could not find python executable to install deps: {py_bin}")
                 raise
-        shutil.copytree(
-            os.path.join(python_loc, "Lib", "site-packages"),
-            f"feet/cpython/lib/site-packages",
-        )
+        # shutil.copytree(
+        #     os.path.join(python_loc, "Lib", "site-packages"),
+        #     f"feet/cpython/lib/site-packages",
+        # )
         zipdir(
             './feet/',
             '.',
