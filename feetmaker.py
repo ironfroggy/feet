@@ -19,6 +19,7 @@ subparsers = parser.add_subparsers(dest='command')
 
 build_parser = subparsers.add_parser('build')
 build_parser.add_argument('--debug', action='store_true')
+build_parser.add_argument('-o', action='store', default=None, dest='output')
 
 clean_parser = subparsers.add_parser('clean')
 
@@ -26,6 +27,7 @@ setup_parser = subparsers.add_parser('setup')
 
 python_parser = subparsers.add_parser('python')
 
+version = open("VERSION.txt").read()
 arch = "amd64" # win32 or amd64
 python_loc_default = "cpython"
 python_loc = os.getenv("FEET_PYTHON_DIR", python_loc_default)
@@ -109,7 +111,7 @@ def ignore_excludes(dirname, names):
 
 
 def zipdir(path, relto, dest, compression):
-    zipf = zipfile.ZipFile(dest, 'w', compression)
+    zipf = zipfile.ZipFile(dest, 'w', compression, compresslevel=9)
     relto = relto or path
 
     if path.endswith('*'):
@@ -150,7 +152,8 @@ def main():
         subprocess.check_call(f"{python_loc}\\PCBuild\\build.bat -c Release -p {p} -t Build")
 
     elif not args.command or args.command == "build":
-        clean()
+        if os.path.exists("feet/cpython"):
+            shutil.rmtree("feet/cpython")
 
         print("Compiling bootloader...")
         subprocess.check_call("cargo build")
@@ -224,7 +227,10 @@ def main():
 
         base = open('target/debug/feet.exe', 'rb')
         archive = open('feetruntime.zip', 'rb')
-        final = open('build/feet.exe', 'wb')
+        output = args.output or 'build/feet-{arch}-{version}'
+        if not output.endswith('.exe'):
+            output += '.exe'
+        final = open(output, 'wb')
 
         final.write(base.read())
         final.write(archive.read())

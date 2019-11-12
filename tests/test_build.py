@@ -31,7 +31,7 @@ def rundir():
 @pytest.fixture(scope='session')
 def build():
     print("BUILDING")
-    p = Popen("python feetmaker.py", stdout=PIPE, stderr=PIPE)
+    p = Popen("python feetmaker.py build -o build/feet.exe", stdout=PIPE, stderr=PIPE)
     stdout, stderr = p.communicate()
     assert p.returncode == 0, stderr
 
