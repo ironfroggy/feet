@@ -9,3 +9,4 @@
 - Fixed a bug in unpack and install on first launch, was running on every launch
 - Created a flag file `requirements_installed.txt` to indicate completed installation
 - Automated the build step in a new command, `python`, including checkout
+- Added -o flag to control output name
