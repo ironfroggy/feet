@@ -211,12 +211,6 @@ def main():
                 logger.error(f"Could not find python executable to install deps: {feet_py}")
                 raise
 
-        # # Copy installed packages
-        # shutil.copytree(
-        #     os.path.join(python_loc, "Lib", "site-packages"),
-        #     f"feet/cpython/lib/site-packages",
-        # # )
-
         # Create archive to attach to runtime
         zipdir(
             './feet/',
