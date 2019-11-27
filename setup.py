@@ -5,7 +5,7 @@ with open("README.md", "r", encoding='utf8') as f:
 
 setuptools.setup(
     name="feet",
-    version="0.0.3",
+    version=open("VERSION.txt").read(),
     author="Calvin Spealman",
     author_email="ironfroggy@gmail.com",
     description="Feet makes Python run",

@@ -31,7 +31,7 @@ def rundir():
 @pytest.fixture(scope='session')
 def build():
     print("BUILDING")
-    p = Popen("python feetmaker.py")
+    p = Popen("python feetmaker.py build -o build/feet.exe", stdout=PIPE, stderr=PIPE)
     stdout, stderr = p.communicate()
     assert p.returncode == 0, stderr
 
@@ -58,7 +58,7 @@ def test_setup(tempdir):
 def test_run(tempdir):
     open('main.py', 'w').write('print("Hello, World!")')
 
-    p = Popen("feet.exe", stdout=PIPE, universal_newlines=True)
+    p = Popen("feet.exe", stdout=PIPE, stderr=PIPE, universal_newlines=True)
     stdout, stderr = p.communicate()
     ret = p.returncode
 
