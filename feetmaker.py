@@ -26,6 +26,7 @@ clean_parser = subparsers.add_parser('clean')
 setup_parser = subparsers.add_parser('setup')
 
 python_parser = subparsers.add_parser('python')
+python_parser.add_argument('-p', dest='pyversion', action='store', default='3.7')
 
 version = open("VERSION.txt").read()
 arch = "amd64" # win32 or amd64
@@ -141,7 +142,10 @@ def main():
         if not os.path.exists(python_loc):
             assert python_loc_default == python_loc, "No python checkout found at FEET_PYTHON_DIR"
             subprocess.check_call(f"git clone https://github.com/python/cpython.git {python_loc}")
-            subprocess.check_call(f"git checkout 3.7")
+        os.chdir(python_loc)
+        subprocess.check_call("git fetch")
+        subprocess.check_call(f"git reset --hard origin/{args.pyversion}")
+        os.chdir('..')
 
         assert os.path.exists(f"./{python_loc}/PCBuild/build.bat")
         if arch == "amd64":
