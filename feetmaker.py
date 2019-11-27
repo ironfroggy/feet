@@ -225,7 +225,7 @@ def main():
 
         base = open('target/debug/feet.exe', 'rb')
         archive = open('feetruntime.zip', 'rb')
-        output = args.output or 'build/feet-{arch}-{version}'
+        output = args.output or f'build/feet-{arch}-{version}'
         if not output.endswith('.exe'):
             output += '.exe'
         final = open(output, 'wb')
