@@ -20,6 +20,7 @@ subparsers = parser.add_subparsers(dest='command')
 build_parser = subparsers.add_parser('build')
 build_parser.add_argument('--debug', action='store_true')
 build_parser.add_argument('-o', action='store', default=None, dest='output')
+build_parser.add_argument('-a', dest='arch', action='store', default='amd64', help='"win32" or "amd64" architecture')
 
 clean_parser = subparsers.add_parser('clean')
 
@@ -27,9 +28,13 @@ setup_parser = subparsers.add_parser('setup')
 
 python_parser = subparsers.add_parser('python')
 python_parser.add_argument('-p', dest='pyversion', action='store', default='3.7')
+python_parser.add_argument('-a', dest='arch', action='store', default='amd64', help='"win32" or "amd64" architecture')
+
+argv = sys.argv[1:]
+args = parser.parse_args(argv)
 
 version = open("VERSION.txt").read()
-arch = "amd64" # win32 or amd64
+arch = getattr(args, 'arch', 'amd64')
 python_loc_default = "cpython"
 python_loc = os.getenv("FEET_PYTHON_DIR", python_loc_default)
 py_bin = os.path.join(python_loc, 'PCBuild', arch, 'python.exe')
@@ -131,8 +136,6 @@ def zipdir(path, relto, dest, compression):
 
 
 def main():
-    argv = sys.argv[1:]
-    args = parser.parse_args(argv)
 
     if not os.path.exists("feetmaker.py"):
         print("You are not in the feet repo. Cannot build.")
@@ -225,7 +228,7 @@ def main():
 
         base = open('target/debug/feet.exe', 'rb')
         archive = open('feetruntime.zip', 'rb')
-        output = args.output or f'build/feet-{arch}-{version}'
+        output = getattr(args, 'output', None) or f'build/feet-{arch}-{version}'
         if not output.endswith('.exe'):
             output += '.exe'
         final = open(output, 'wb')

@@ -31,9 +31,15 @@ def rundir():
 @pytest.fixture(scope='session')
 def build():
     print("BUILDING")
-    p = Popen("python feetmaker.py build -o build/feet.exe", stdout=PIPE, stderr=PIPE)
-    stdout, stderr = p.communicate()
-    assert p.returncode == 0, stderr
+    exe = os.getenv('FEET_TEST_EXE', None)
+    if exe:
+        copyfile(exe, 'build/feet.exe')
+        print(f"USING {exe}")
+    else:
+        assert 0
+        p = Popen("python feetmaker.py build -o build/feet.exe", stdout=PIPE, stderr=PIPE)
+        stdout, stderr = p.communicate()
+        assert p.returncode == 0, stderr
 
 @pytest.fixture(scope='session')
 def tempdir(build, rundir):
