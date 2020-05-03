@@ -2,6 +2,7 @@ import argparse
 import fnmatch
 import glob
 import os
+import pkg_resources
 import shutil
 import subprocess
 import sys
@@ -20,8 +21,6 @@ sys.path.insert(0, site_packages)
 # Add path for the actual project, main script and all
 # TODO: Decide if this is necessary...?
 sys.path.insert(0, '.')
-
-import requirements
 
 
 HELP = """FEET, it makes Python run!
@@ -159,18 +158,18 @@ def main(argv):
             cur_libraries = {}
 
             if os.path.exists('requirements.txt'):
-                for line in requirements.parse(open('requirements.txt')):
-                    cur_libraries[line.name] = line.line
-            new_req = list(requirements.parse(args.spec))[0]
-            cur_libraries[new_req.name] = new_req.line
+                for req in pkg_resources.parse_requirements(open('requirements.txt')):
+                    cur_libraries[req.name] = req.specifier
+            new_req = list(pkg_resources.parse_requirements(args.spec))[0]
+            cur_libraries[new_req.name] = new_req.specifier
 
-            args = ['install', '--trusted-host=pypi.org', new_req.line]
+            args = ['install', '--trusted-host=pypi.org', args.spec]
             subprocess.check_call([py_bin, '-m', 'pip', *args])
 
             print("Updating project requirements.txt file...")
             with open('requirements.txt', 'w') as f:
-                for _, line in cur_libraries.items():
-                    f.write(f'{line}\n')
+                for name, spec in cur_libraries.items():
+                    f.write(f'{name}{spec}\n')
     
     elif args.command == 'exe':
         name = args.name

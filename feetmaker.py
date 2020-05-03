@@ -26,7 +26,7 @@ clean_parser = subparsers.add_parser('clean')
 setup_parser = subparsers.add_parser('setup')
 
 python_parser = subparsers.add_parser('python')
-python_parser.add_argument('-p', dest='pyversion', action='store', default='3.7')
+python_parser.add_argument('-p', dest='pyversion', action='store', default='v3.8.2')
 
 version = open("VERSION.txt").read()
 arch = "amd64" # win32 or amd64
@@ -51,7 +51,7 @@ zip_excludes = [
 # These third-party packages will be included in the build
 py_deps = (
     'pip',
-    'requirements-parser',
+    # 'requirements-parser',
     'setuptools',
     # 'pkg_resources',
 )
@@ -144,7 +144,8 @@ def main():
             subprocess.check_call(f"git clone https://github.com/python/cpython.git {python_loc}")
         os.chdir(python_loc)
         subprocess.check_call("git fetch")
-        subprocess.check_call(f"git reset --hard origin/{args.pyversion}")
+        subprocess.check_call("git reset --hard HEAD")
+        subprocess.check_call(f"git checkout {args.pyversion}")
         os.chdir('..')
 
         assert os.path.exists(f"./{python_loc}/PCBuild/build.bat")
@@ -194,7 +195,7 @@ def main():
         zipdir(
             os.path.join(python_loc, "lib"),
             None,
-            os.path.join("feet", "cpython", "python37.zip"),
+            os.path.join("feet", "cpython", "python38.zip"),
             zipfile.ZIP_DEFLATED,
         )
 
@@ -231,7 +232,7 @@ def main():
 
         base = open('target/debug/feet.exe', 'rb')
         archive = open('feetruntime.zip', 'rb')
-        output = args.output or 'build/feet-{arch}-{version}'
+        output = args.output or f'build/feet-{arch}-{version}'
         if not output.endswith('.exe'):
             output += '.exe'
         final = open(output, 'wb')
