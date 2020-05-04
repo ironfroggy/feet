@@ -3,6 +3,7 @@ from io import StringIO
 import os
 from shutil import copyfile
 from subprocess import call, Popen, PIPE
+import sys
 from tempfile import TemporaryDirectory
 from time import sleep
 from zipfile import ZipFile
@@ -115,6 +116,38 @@ def test_exe(rundir, tempdir, build):
 
             lines = stdout.splitlines()
             assert lines and lines[-1] == "ok", stderr
+
+
+def test_exe_auto(rundir, tempdir, build):
+    src = os.path.join(rundir, 'build', 'feet.exe')
+    dest = os.path.join(tempdir, 'feet.exe')
+    copyfile(src, dest)
+
+    open('main.py', 'w').write(MAIN_SETUPTOOLS)
+    open('module.py', 'w').write("")
+    open('compiled.pyc', 'w').write("")
+
+    call('./feet.exe library pysdl2-dll')
+    call('./feet.exe library pysdl2')
+    assert os.path.exists('feet_data/cpython/lib/site-packages/sdl2')
+    call('./feet.exe exe testprog.exe')
+    with TemporaryDirectory() as exedir:
+        copyfile('dist/testprog.exe', os.path.join(exedir, 'testprog.exe'))
+
+        with cd(exedir):
+            assert 0 == call('./testprog.exe setup', stdout=sys.stdout, stderr=sys.stderr), str(os.listdir(exedir))
+
+            print("Running test program")
+            p = Popen("testprog.exe", stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            stdout, stderr = p.communicate()
+            ret = p.returncode
+
+            lines = stdout.splitlines()
+            assert lines and lines[-1] == "ok", stderr
+
+            assert os.path.exists(os.path.join(exedir, 'testprog_data', 'app', 'main.py'))
+            assert os.path.exists(os.path.join(exedir, 'testprog_data', 'app', 'module.py'))
+            assert not os.path.exists(os.path.join(exedir, 'testprog_data', 'app', 'compiled.pyc'))
 
 
 def test_zip(rundir, tempdir, build):

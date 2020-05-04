@@ -9,13 +9,29 @@ import sys
 import zipfile
 
 root = os.path.abspath(os.path.dirname(__file__))
-feet_bin = root.split('_data')[0] + '.exe'
+
+def _set_root_relative():
+    global feet_bin
+    global site_packages
+    global zip_excludes
+
+    feet_bin = root.split('_data')[0] + '.exe'
+    site_packages = os.path.join(root, 'cpython', 'lib', 'site-packages')
+
+    zip_excludes = [
+        "*.pyc",
+        "*__pycache__*",
+        "dist",
+        os.path.basename(root),
+        os.path.basename(feet_bin),
+    ]
+
+_set_root_relative()
 
 # Add path for included third-party packages with the Feet runtime
 sys.path.insert(0, os.path.join(sys.executable, 'Lib', 'site-packages'))
 
 # Add path for project required Python dependencies
-site_packages = os.path.join(root, 'cpython', 'lib', 'site-packages')
 sys.path.insert(0, site_packages)
 
 # Add path for the actual project, main script and all
@@ -66,10 +82,6 @@ zip_parser = subparsers.add_parser('zip')
 zip_parser.add_argument('name', type=str, action='store')
 zip_parser.add_argument('files', type=str, nargs='*')
 
-zip_excludes = [
-    "*.pyc",
-    "*__pycache__*",
-]
 
 def add_to_zip(path, dest, compression, prefix=None):
     if prefix is None:
@@ -101,6 +113,21 @@ def add_to_zip(path, dest, compression, prefix=None):
     zipf.close()
 
 
+def get_app_files(files):
+    if files:
+        yield from files
+    else:
+        for fn in os.listdir('.'):
+            include = True
+            for exc in zip_excludes:
+                if fnmatch.fnmatch(fn, exc):
+                    include = False
+                    break
+            if include:
+                yield fn
+
+
+
 def main(argv):
     feet_exec = argv.pop(0)
     args = parser.parse_args(argv)
@@ -108,9 +135,10 @@ def main(argv):
     assert os.path.exists(feet_bin)
     py_bin = os.path.join(root, "cpython", "python.exe")
     
-    main =  os.path.join(root, "app", "main.py")
+    main = os.path.join(root, "app", "main.py")
     if not os.path.exists(main):
-        main =  os.path.join(root, "..", "main.py")
+        main = os.path.join(root, "..", "main.py")
+    main = os.path.abspath(main)
     if not os.path.exists(main):
         print(HELP)
         exit(1)
@@ -124,6 +152,7 @@ def main(argv):
         })
         proc = subprocess.Popen(
             [py_bin, main],
+            cwd=os.path.dirname(main),
             env=env,
             stdout=sys.stdout,
             stderr=sys.stderr,
@@ -180,15 +209,16 @@ def main(argv):
             if not os.path.exists('dist'):
                 os.mkdir('dist')
 
-        include = args.files or [main]
+        include = args.files or [os.path.basename(main)]
         zip_excludes.append(os.path.join(os.path.abspath(root), '*'))
         zip_excludes.append(os.path.join(os.path.abspath("dist"), '*'))
 
         shutil.copy(feet_bin, name)
 
         zf = zipfile.ZipFile(name, 'a', zipfile.ZIP_BZIP2)
-        for pattern in include:
-            for f in glob.glob(pattern):
+        for f in include:
+        # for pattern in include:
+            # for f in glob.glob(pattern):
                 print(f, "->", os.path.join("feet", "app", f))
                 zf.write(f, os.path.join("feet", "app", f))
         zf.close()
