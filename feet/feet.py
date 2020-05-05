@@ -209,7 +209,7 @@ def main(argv):
             if not os.path.exists('dist'):
                 os.mkdir('dist')
 
-        include = args.files or [os.path.basename(main)]
+        include = get_app_files(args.files)
         zip_excludes.append(os.path.join(os.path.abspath(root), '*'))
         zip_excludes.append(os.path.join(os.path.abspath("dist"), '*'))
 
@@ -235,7 +235,7 @@ def main(argv):
         if not os.path.exists("dist"):
             os.makedirs("dist")
         
-        include = args.files or [main]
+        include = get_app_files(args.files)
         zip_excludes.append(os.path.join(os.path.abspath(root), '*'))
         zip_excludes.append(os.path.join(os.path.abspath("dist"), '*'))
 
