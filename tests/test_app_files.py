@@ -39,5 +39,7 @@ def test_excludes():
 
     with patch('os.listdir') as listdir:
         listdir.return_value = files
-        include = list(feet.get_app_files(None))
-        assert include == ['main.py',]
+        include = set(feet.get_app_files(None))
+        assert include == set(['main.py', 'feet.exe'])
+        include = set(feet.get_app_files(None, exclude=['*.exe']))
+        assert include == set(['main.py'])

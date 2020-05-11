@@ -1,6 +1,7 @@
 import argparse
 import fnmatch
 import glob
+import itertools
 import os
 import pkg_resources
 import shutil
@@ -21,9 +22,9 @@ def _set_root_relative():
     zip_excludes = [
         "*.pyc",
         "*__pycache__*",
-        "dist",
-        os.path.basename(root),
-        os.path.basename(feet_bin),
+        "dist*",
+        ".git*",
+        os.path.basename(root) + '*',
     ]
 
 _set_root_relative()
@@ -77,6 +78,7 @@ setup_parser = subparsers.add_parser('setup')
 exe_parser = subparsers.add_parser('exe')
 exe_parser.add_argument('name', type=str, action='store')
 exe_parser.add_argument('files', type=str, nargs='*')
+exe_parser.add_argument('--confirm', action='store_true')
 
 zip_parser = subparsers.add_parser('zip')
 zip_parser.add_argument('name', type=str, action='store')
@@ -84,8 +86,6 @@ zip_parser.add_argument('files', type=str, nargs='*')
 
 
 def add_to_zip(path, dest, compression, prefix=None):
-    if prefix is None:
-        prefix = os.path.join("feet", "app")
     zipf = zipfile.ZipFile(dest, 'a', compression)
 
     for root, _, files in os.walk(path):
@@ -93,33 +93,34 @@ def add_to_zip(path, dest, compression, prefix=None):
             src = os.path.join(root, file)
             name = os.path.relpath(src, ".")
             base = name.split(os.path.sep, 1)[0]
-            if base.endswith('_data'):
-                name = name.replace(base, 'feet', 1)
 
+            # print(name, '...', end='')
             excluded = False
             for pattern in zip_excludes:
-                if fnmatch.fnmatch(os.path.abspath(name), pattern):
+                if fnmatch.fnmatch(name, pattern):
                     excluded = True
+                    # print('skip')
                     break
             if not excluded:
-                name = os.path.relpath(os.path.join(prefix, name))
+                # print('ok')
+                if prefix:
+                    name = os.path.relpath(os.path.join(prefix, name))
                 name = name.replace('\\', '/')
                 try:
                     zipf.getinfo(name)
                 except KeyError:
-                    print("...", name)
                     zipf.write(src, name)
     
     zipf.close()
 
 
-def get_app_files(files):
+def get_app_files(files, exclude=()):
     if files:
         yield from files
     else:
         for fn in os.listdir('.'):
             include = True
-            for exc in zip_excludes:
+            for exc in itertools.chain(zip_excludes, exclude):
                 if fnmatch.fnmatch(fn, exc):
                     include = False
                     break
@@ -201,6 +202,9 @@ def main(argv):
                     f.write(f'{name}{spec}\n')
     
     elif args.command == 'exe':
+        if not args.confirm:
+            print("The exe packing command is experimental. Use --confirm to confirm opting into using it.")
+            exit(1)
         name = args.name
         if not name.endswith('.exe'):
             name += ".exe"
@@ -209,22 +213,17 @@ def main(argv):
             if not os.path.exists('dist'):
                 os.mkdir('dist')
 
-        include = get_app_files(args.files)
-        zip_excludes.append(os.path.join(os.path.abspath(root), '*'))
-        zip_excludes.append(os.path.join(os.path.abspath("dist"), '*'))
 
         shutil.copy(feet_bin, name)
+        include = get_app_files(args.files, exclude=[feet_bin])
+        prefix = '.'
 
         zf = zipfile.ZipFile(name, 'a', zipfile.ZIP_BZIP2)
         for f in include:
-        # for pattern in include:
-            # for f in glob.glob(pattern):
-                print(f, "->", os.path.join("feet", "app", f))
-                zf.write(f, os.path.join("feet", "app", f))
+            zf.write(f, os.path.join(prefix, f))
         zf.close()
 
-        if os.path.exists(site_packages):
-            add_to_zip(site_packages, name, zipfile.ZIP_BZIP2, prefix='.')
+        add_to_zip(".", name, zipfile.ZIP_BZIP2, prefix=prefix)
     
     elif args.command == 'zip':
         name = args.name
@@ -236,14 +235,10 @@ def main(argv):
             os.makedirs("dist")
         
         include = get_app_files(args.files)
-        zip_excludes.append(os.path.join(os.path.abspath(root), '*'))
-        zip_excludes.append(os.path.join(os.path.abspath("dist"), '*'))
 
-        zf = zipfile.ZipFile(name, 'a', zipfile.ZIP_BZIP2)
-        for pattern in include:
-            for f in glob.glob(pattern):
-                print(f, "->", os.path.join("feet", "app", f))
-                zf.write(f, os.path.join("feet", "app", f))
+        zf = zipfile.ZipFile(name, 'a', zipfile.ZIP_DEFLATED)
+        for f in include:
+            zf.write(f, f)
         zf.close()
 
         add_to_zip(".", name, zipfile.ZIP_DEFLATED, prefix=".")

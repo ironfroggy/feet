@@ -92,6 +92,7 @@ def test_setuptools_package(rundir, tempdir, build):
     assert lines[-1] == "ok", stderr
 
 
+@pytest.mark.skip
 def test_exe(rundir, tempdir, build):
     src = os.path.join(rundir, 'build', 'feet.exe')
     dest = os.path.join(tempdir, 'feet.exe')
@@ -104,7 +105,7 @@ def test_exe(rundir, tempdir, build):
     assert os.path.exists('feet_data/cpython/lib/site-packages/sdl2')
     call('./feet.exe exe testprog.exe main.py')
     with TemporaryDirectory() as exedir:
-        copyfile('dist/testprog.exe', os.path.join(exedir, 'testprog.exe'))
+        copyfile(os.path.join(rundir, 'dist/testprog.exe'), os.path.join(exedir, 'testprog.exe'))
 
         with cd(exedir):
             assert 0 == call('./testprog.exe setup')
@@ -118,6 +119,7 @@ def test_exe(rundir, tempdir, build):
             assert lines and lines[-1] == "ok", stderr
 
 
+@pytest.mark.skip
 def test_exe_auto(rundir, tempdir, build):
     src = os.path.join(rundir, 'build', 'feet.exe')
     dest = os.path.join(tempdir, 'feet.exe')
@@ -132,7 +134,7 @@ def test_exe_auto(rundir, tempdir, build):
     assert os.path.exists('feet_data/cpython/lib/site-packages/sdl2')
     call('./feet.exe exe testprog.exe')
     with TemporaryDirectory() as exedir:
-        copyfile('dist/testprog.exe', os.path.join(exedir, 'testprog.exe'))
+        copyfile(os.path.join(rundir, 'dist/testprog.exe'), os.path.join(exedir, 'testprog.exe'))
 
         with cd(exedir):
             assert 0 == call('./testprog.exe setup', stdout=sys.stdout, stderr=sys.stderr), str(os.listdir(exedir))

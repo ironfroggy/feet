@@ -2,6 +2,7 @@
 
 import argparse
 import fnmatch
+import json
 import logging
 import os
 import shutil
@@ -20,6 +21,7 @@ subparsers = parser.add_subparsers(dest='command')
 build_parser = subparsers.add_parser('build')
 build_parser.add_argument('--debug', action='store_true')
 build_parser.add_argument('-o', action='store', default=None, dest='output')
+build_parser.add_argument('-a', '--arch', dest='arch', action='store', default='win32', choices=['win32', 'amd64'])
 
 clean_parser = subparsers.add_parser('clean')
 
@@ -27,12 +29,11 @@ setup_parser = subparsers.add_parser('setup')
 
 python_parser = subparsers.add_parser('python')
 python_parser.add_argument('-p', dest='pyversion', action='store', default='v3.8.2')
+python_parser.add_argument('-a', '--arch', dest='arch', action='store', default='win32', choices=['win32', 'amd64'])
 
 version = open("VERSION.txt").read()
-arch = "amd64" # win32 or amd64
 python_loc_default = "cpython"
 python_loc = os.getenv("FEET_PYTHON_DIR", python_loc_default)
-py_bin = os.path.join(python_loc, 'PCBuild', arch, 'python.exe')
 
 # These patterns will be excluded from the generated Zip archives
 zip_excludes = [
@@ -149,10 +150,10 @@ def main():
         os.chdir('..')
 
         assert os.path.exists(f"./{python_loc}/PCBuild/build.bat")
-        if arch == "amd64":
+        if args.arch == "amd64":
             p = "x64"
         else:
-            p = arch
+            p = args.arch
         print(f"./{python_loc}/PCBuild/build.bat -c Release -p {p} -t Build")
         subprocess.check_call(f"{python_loc}\\PCBuild\\build.bat -c Release -p {p} -t Build")
 
@@ -161,11 +162,11 @@ def main():
             shutil.rmtree("feet/cpython")
 
         print("Compiling bootloader...")
-        subprocess.check_call("cargo build")
+        subprocess.check_call("cargo build --release")
 
         print("Creating runtime archive...")
         shutil.copytree(
-            os.path.join(python_loc, "PCbuild", arch),
+            os.path.join(python_loc, "PCbuild", args.arch),
             "feet/cpython",
             ignore=ignore_excludes,
         )
@@ -230,9 +231,9 @@ def main():
         if not os.path.exists('build'):
             os.mkdir('build')
 
-        base = open('target/debug/feet.exe', 'rb')
+        base = open('target/release/feet.exe', 'rb')
         archive = open('feetruntime.zip', 'rb')
-        output = args.output or f'build/feet-{arch}-{version}'
+        output = args.output or f'build/feet-{args.arch}-{version}'
         if not output.endswith('.exe'):
             output += '.exe'
         final = open(output, 'wb')
@@ -243,6 +244,15 @@ def main():
         final.close()
         base.close()
         archive.close()
+
+        # add metadata
+        final = zipfile.ZipFile(output, 'a')
+        final.comment = json.dumps({
+            'feet_format': '1',
+            'feet_arch': args.arch,
+            'feet_runner_size': os.stat('target/release/feet.exe').st_size,
+            'feet_archive_size': os.stat('feetruntime.zip').st_size,
+        }).encode('utf8')
 
         print("Done.")
 
