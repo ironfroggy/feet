@@ -3,6 +3,7 @@ from io import StringIO
 import os
 from shutil import copyfile
 from subprocess import call, Popen, PIPE
+import sys
 from tempfile import TemporaryDirectory
 from time import sleep
 from zipfile import ZipFile
@@ -36,7 +37,6 @@ def build():
         copyfile(exe, 'build/feet.exe')
         print(f"USING {exe}")
     else:
-        assert 0
         p = Popen("python feetmaker.py build -o build/feet.exe", stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
         assert p.returncode == 0, stderr
@@ -74,7 +74,7 @@ def test_run(tempdir):
     assert ret == 0, stderr
 
 MAIN_SETUPTOOLS = '''
-import future
+import sdl2
 print("ok")
 '''
 
@@ -83,10 +83,11 @@ def test_setuptools_package(rundir, tempdir, build):
     dest = os.path.join(tempdir, 'feet.exe')
     copyfile(src, dest)
 
-    call('./feet.exe library future')
-    assert not os.path.exists('./Lib')
-
     open('main.py', 'w').write(MAIN_SETUPTOOLS)
+
+    call('./feet.exe library pysdl2-dll')
+    call('./feet.exe library pysdl2')
+    assert not os.path.exists('./Lib')
 
     p = Popen("feet.exe", stdout=PIPE, universal_newlines=True)
     stdout, stderr = p.communicate()
@@ -96,6 +97,7 @@ def test_setuptools_package(rundir, tempdir, build):
     assert lines[-1] == "ok", stderr
 
 
+@pytest.mark.skip
 def test_exe(rundir, tempdir, build):
     src = os.path.join(rundir, 'build', 'feet.exe')
     dest = os.path.join(tempdir, 'feet.exe')
@@ -103,11 +105,12 @@ def test_exe(rundir, tempdir, build):
 
     open('main.py', 'w').write(MAIN_SETUPTOOLS)
 
-    call('./feet.exe library future')
-    assert os.path.exists('feet_data/cpython/lib/site-packages/future')
+    call('./feet.exe library pysdl2-dll')
+    call('./feet.exe library pysdl2')
+    assert os.path.exists('feet_data/cpython/lib/site-packages/sdl2')
     call('./feet.exe exe testprog.exe main.py')
     with TemporaryDirectory() as exedir:
-        copyfile('dist/testprog.exe', os.path.join(exedir, 'testprog.exe'))
+        copyfile(os.path.join(rundir, 'dist/testprog.exe'), os.path.join(exedir, 'testprog.exe'))
 
         with cd(exedir):
             assert 0 == call('./testprog.exe setup')
@@ -121,6 +124,39 @@ def test_exe(rundir, tempdir, build):
             assert lines and lines[-1] == "ok", stderr
 
 
+@pytest.mark.skip
+def test_exe_auto(rundir, tempdir, build):
+    src = os.path.join(rundir, 'build', 'feet.exe')
+    dest = os.path.join(tempdir, 'feet.exe')
+    copyfile(src, dest)
+
+    open('main.py', 'w').write(MAIN_SETUPTOOLS)
+    open('module.py', 'w').write("")
+    open('compiled.pyc', 'w').write("")
+
+    call('./feet.exe library pysdl2-dll')
+    call('./feet.exe library pysdl2')
+    assert os.path.exists('feet_data/cpython/lib/site-packages/sdl2')
+    call('./feet.exe exe testprog.exe')
+    with TemporaryDirectory() as exedir:
+        copyfile(os.path.join(rundir, 'dist/testprog.exe'), os.path.join(exedir, 'testprog.exe'))
+
+        with cd(exedir):
+            assert 0 == call('./testprog.exe setup', stdout=sys.stdout, stderr=sys.stderr), str(os.listdir(exedir))
+
+            print("Running test program")
+            p = Popen("testprog.exe", stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            stdout, stderr = p.communicate()
+            ret = p.returncode
+
+            lines = stdout.splitlines()
+            assert lines and lines[-1] == "ok", stderr
+
+            assert os.path.exists(os.path.join(exedir, 'testprog_data', 'app', 'main.py'))
+            assert os.path.exists(os.path.join(exedir, 'testprog_data', 'app', 'module.py'))
+            assert not os.path.exists(os.path.join(exedir, 'testprog_data', 'app', 'compiled.pyc'))
+
+
 def test_zip(rundir, tempdir, build):
     src = os.path.join(rundir, 'build', 'feet.exe')
     dest = os.path.join(tempdir, 'feet.exe')
@@ -128,8 +164,9 @@ def test_zip(rundir, tempdir, build):
 
     open('main.py', 'w').write(MAIN_SETUPTOOLS)
 
-    call('./feet.exe library future')
-    assert os.path.exists('feet_data/cpython/lib/site-packages/future')
+    call('./feet.exe library pysdl2-dll')
+    call('./feet.exe library pysdl2')
+    assert os.path.exists('feet_data/cpython/lib/site-packages/sdl2')
     call('./feet.exe zip testprog.zip')
     with TemporaryDirectory() as exedir:
         copyfile('dist/testprog.zip', os.path.join(exedir, 'testprog.zip'))

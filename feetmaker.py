@@ -2,6 +2,7 @@
 
 import argparse
 import fnmatch
+import json
 import logging
 import os
 import shutil
@@ -20,24 +21,19 @@ subparsers = parser.add_subparsers(dest='command')
 build_parser = subparsers.add_parser('build')
 build_parser.add_argument('--debug', action='store_true')
 build_parser.add_argument('-o', action='store', default=None, dest='output')
-build_parser.add_argument('-a', dest='arch', action='store', default='amd64', help='"win32" or "amd64" architecture')
+build_parser.add_argument('-a', '--arch', dest='arch', action='store', default='win32', choices=['win32', 'amd64'])
 
 clean_parser = subparsers.add_parser('clean')
 
 setup_parser = subparsers.add_parser('setup')
 
 python_parser = subparsers.add_parser('python')
-python_parser.add_argument('-p', dest='pyversion', action='store', default='3.7')
-python_parser.add_argument('-a', dest='arch', action='store', default='amd64', help='"win32" or "amd64" architecture')
-
-argv = sys.argv[1:]
-args = parser.parse_args(argv)
+python_parser.add_argument('-p', dest='pyversion', action='store', default='v3.8.2')
+python_parser.add_argument('-a', '--arch', dest='arch', action='store', default='win32', choices=['win32', 'amd64'])
 
 version = open("VERSION.txt").read()
-arch = getattr(args, 'arch', 'amd64')
 python_loc_default = "cpython"
 python_loc = os.getenv("FEET_PYTHON_DIR", python_loc_default)
-py_bin = os.path.join(python_loc, 'PCBuild', arch, 'python.exe')
 
 # These patterns will be excluded from the generated Zip archives
 zip_excludes = [
@@ -56,7 +52,7 @@ zip_excludes = [
 # These third-party packages will be included in the build
 py_deps = (
     'pip',
-    'requirements-parser',
+    # 'requirements-parser',
     'setuptools',
     # 'pkg_resources',
 )
@@ -135,7 +131,7 @@ def zipdir(path, relto, dest, compression):
     zipf.close()
 
 
-def main():
+def main(args):
 
     if not os.path.exists("feetmaker.py"):
         print("You are not in the feet repo. Cannot build.")
@@ -147,14 +143,15 @@ def main():
             subprocess.check_call(f"git clone https://github.com/python/cpython.git {python_loc}")
         os.chdir(python_loc)
         subprocess.check_call("git fetch")
-        subprocess.check_call(f"git reset --hard origin/{args.pyversion}")
+        subprocess.check_call("git reset --hard HEAD")
+        subprocess.check_call(f"git checkout {args.pyversion}")
         os.chdir('..')
 
         assert os.path.exists(f"./{python_loc}/PCBuild/build.bat")
-        if arch == "amd64":
+        if args.arch == "amd64":
             p = "x64"
         else:
-            p = arch
+            p = args.arch
         print(f"./{python_loc}/PCBuild/build.bat -c Release -p {p} -t Build")
         subprocess.check_call(f"{python_loc}\\PCBuild\\build.bat -c Release -p {p} -t Build")
 
@@ -163,11 +160,13 @@ def main():
             shutil.rmtree("feet/cpython")
 
         print("Compiling bootloader...")
-        subprocess.check_call("cargo build")
+        subprocess.check_call("cargo build --release")
 
         print("Creating runtime archive...")
+        py_exe = os.path.join(python_loc, "PCbuild", args.arch, 'python.exe')
+        subprocess.run([py_exe, '-m', 'lib2to3'], stdout=subprocess.PIPE)
         shutil.copytree(
-            os.path.join(python_loc, "PCbuild", arch),
+            os.path.join(python_loc, "PCbuild", args.arch),
             "feet/cpython",
             ignore=ignore_excludes,
         )
@@ -192,17 +191,19 @@ def main():
                             src,
                             "feet/cpython/",
                         )
+        
+        feet_py = "feet/cpython/python.exe"
 
         # Create the stdlib zip to make unpacking faster
         zipdir(
             os.path.join(python_loc, "lib"),
             None,
-            os.path.join("feet", "cpython", "python37.zip"),
+            os.path.join("feet", "cpython", "python38.zip"),
             zipfile.ZIP_DEFLATED,
         )
 
         # Create the archive to attach to feet.exe to self-extract
-        feet_py = "feet/cpython/python.exe"
+        
         subprocess.check_call([feet_py, '-m', 'ensurepip'])
         for name in py_deps:
             try:
@@ -226,7 +227,7 @@ def main():
         if not os.path.exists('build'):
             os.mkdir('build')
 
-        base = open('target/debug/feet.exe', 'rb')
+        base = open('target/release/feet.exe', 'rb')
         archive = open('feetruntime.zip', 'rb')
         output = getattr(args, 'output', None) or f'build/feet-{arch}-{version}'
         if not output.endswith('.exe'):
@@ -240,6 +241,15 @@ def main():
         base.close()
         archive.close()
 
+        # add metadata
+        final = zipfile.ZipFile(output, 'a')
+        final.comment = json.dumps({
+            'feet_format': '1',
+            'feet_arch': args.arch,
+            'feet_runner_size': os.stat('target/release/feet.exe').st_size,
+            'feet_archive_size': os.stat('feetruntime.zip').st_size,
+        }).encode('utf8')
+
         print("Done.")
 
     elif args.command == "clean":
@@ -250,4 +260,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    argv = sys.argv[1:]
+    args = parser.parse_args(argv)
+    main(args)
