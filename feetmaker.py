@@ -165,6 +165,8 @@ def main():
         subprocess.check_call("cargo build --release")
 
         print("Creating runtime archive...")
+        py_exe = os.path.join(python_loc, "PCbuild", args.arch, 'python.exe')
+        subprocess.run([py_exe, '-m', 'lib2to3'], stdout=subprocess.PIPE)
         shutil.copytree(
             os.path.join(python_loc, "PCbuild", args.arch),
             "feet/cpython",
@@ -191,6 +193,8 @@ def main():
                             src,
                             "feet/cpython/",
                         )
+        
+        feet_py = "feet/cpython/python.exe"
 
         # Create the stdlib zip to make unpacking faster
         zipdir(
@@ -201,7 +205,7 @@ def main():
         )
 
         # Create the archive to attach to feet.exe to self-extract
-        feet_py = "feet/cpython/python.exe"
+        
         subprocess.check_call([feet_py, '-m', 'ensurepip'])
         for name in py_deps:
             try:
