@@ -229,7 +229,7 @@ def main(args):
 
         base = open('target/release/feet.exe', 'rb')
         archive = open('feetruntime.zip', 'rb')
-        output = getattr(args, 'output', None) or f'build/feet-{arch}-{version}'
+        output = getattr(args, 'output', None) or f'build/feet-{args.arch}-{version}'
         if not output.endswith('.exe'):
             output += '.exe'
         final = open(output, 'wb')
