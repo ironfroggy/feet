@@ -10,26 +10,28 @@ on:
 
 jobs:
   feet-build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     env:
       # base of a PR, or pushed-to branch outside PRs, or master
       BRANCH: ${{ github.base_ref || github.ref || 'refs/heads/main' }}
 
     steps:
 
+    - uses: actions-rs/toolchain@v1
+    - uses: actions-rs/cargo@v1
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+        architecture: 'x64'
     - uses: actions/checkout@v2
       with:
         path: 'feet'
-    - name: "Install rust"
-      working-directory: "feet"
-      run: |
-        curl https://sh.rustup.rs -sSf | sh -s -- -y
     - name: "Install Python requirements"
       working-directory: "feet"
       run: |
         cd /home/runner/work/feet/feet
-        pip install -r requirements.txt
+        pip install -e .
     - name: "Build Feet"
       working-directory: "feet"
       run: |
-        python build.py build
+        ./build_all.bat
