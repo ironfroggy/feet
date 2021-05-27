@@ -17,13 +17,19 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+      with:
+        path: 'feet'
     - name: "Install rust"
+      working-directory: "feet"
       run: |
         curl https://sh.rustup.rs -sSf | sh -s -- -y
     - name: "Install Python requirements"
+      working-directory: "feet"
       run: |
+        cd /home/runner/work/feet/feet
         pip install -r requirements.txt
     - name: "Build Feet"
+      working-directory: "feet"
       run: |
         python build.py build
