@@ -18,6 +18,10 @@ jobs:
     steps:
 
     - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-pc-windows-msvc
+        
     - uses: actions-rs/cargo@v1
     - uses: actions/setup-python@v2
       with:
