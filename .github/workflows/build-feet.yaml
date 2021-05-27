@@ -1,0 +1,41 @@
+name: Feet Build
+
+on:
+  # allow running manually
+  workflow_dispatch:
+  pull_request:
+    branches: [ '*' ]
+  push:
+    branches: [ 'main', 'stable-*' ]
+
+jobs:
+  feet-build:
+    runs-on: windows-latest
+    env:
+      # base of a PR, or pushed-to branch outside PRs, or master
+      BRANCH: ${{ github.base_ref || github.ref || 'refs/heads/main' }}
+
+    steps:
+
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-pc-windows-msvc
+        
+    - uses: actions-rs/cargo@v1
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+        architecture: 'x64'
+    - uses: actions/checkout@v2
+      with:
+        path: 'feet'
+    - name: "Install Python requirements"
+      working-directory: "feet"
+      run: |
+        cd /home/runner/work/feet/feet
+        pip install -e .
+    - name: "Build Feet"
+      working-directory: "feet"
+      run: |
+        ./build_all.bat
