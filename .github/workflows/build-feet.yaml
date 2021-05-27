@@ -1,0 +1,22 @@
+name: Feet Build
+
+on:
+  # allow running manually
+  workflow_dispatch:
+  pull_request:
+    branches: [ '*' ]
+  push:
+    branches: [ 'main', 'stable-*' ]
+
+jobs:
+  feet-build:
+    runs-on: ubuntu-latest
+    env:
+      # base of a PR, or pushed-to branch outside PRs, or master
+      BRANCH: ${{ github.base_ref || github.ref || 'refs/heads/main' }}
+
+    steps:
+
+    - name: "Install rust"
+      run: |
+        curl https://sh.rustup.rs -sSf | sh
